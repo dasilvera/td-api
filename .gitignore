@@ -1,3 +1,4 @@
 *.csv
 *.json
-chromedriver
+token.pickle
+keys.py
