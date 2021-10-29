@@ -4,7 +4,7 @@ from tda.orders.equities import equity_buy_market, equity_sell_market
 import json
 import platform
 import time
-from keys import buy
+from keys import buy, weights
 
 with open('keys.json') as json_file:
     keys = json.load(json_file)
@@ -29,13 +29,14 @@ account = c.get_account(keys['ACCOUNT_NUMBER'], fields=positionsField).json()
 
 accountId = account['securitiesAccount']['accountId']
 liquidationValue = account['securitiesAccount']['currentBalances']['liquidationValue']
-positions = account['securitiesAccount']['positions']
+positions = account['securitiesAccount'].get('positions', [])
 positions = {position['instrument']['symbol']: int(position['longQuantity']) for position in positions}
+totalCash = account['securitiesAccount']['currentBalances']['totalCash']
 
 # sell old positions
 for stock in positions:
     if stock not in buy:
-        print('SELL:', stock, positions[stock])
+        print('Sell:', stock, positions[stock])
         c.place_order(
             keys['ACCOUNT_NUMBER'],
             equity_sell_market(stock, positions[stock])
@@ -54,11 +55,16 @@ for stock in buy:
 positions_prices = list(positions_prices.items())
 positions_prices.sort(key = lambda x: -x[1])
 
-# balance positions
+if not weights or len(weights) != len(buy):
+    weights = [1] * len(positions_prices)
+weights = dict(zip(buy, weights))
+
+# # balance positions
 for i, (stock, price) in enumerate(positions_prices):
     if i == len(positions_prices) - 1:
-        print('LAST', stock)
+        print('Last:', stock)
         continue
+    price /= weights[stock]
     if i == len(positions_prices) - 1:
         cant = int(liquidationValue / (price * (len(positions_prices) - i)))
     else:
@@ -77,6 +83,3 @@ for i, (stock, price) in enumerate(positions_prices):
             equity_sell_market(stock, -cant)
                 .build())
     time.sleep(1)
-
-print(liquidationValue)
-
